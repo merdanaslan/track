@@ -54,13 +54,17 @@ class MexcClient {
             let currentPage = 1;
             let hasMoreData = true;
 
-            // Calculate date range for 90 days (maximum allowed)
-            const endTime = Date.now();
-            const startTime = endTime - (90 * 24 * 60 * 60 * 1000); // 90 days in milliseconds
+            // Calculate date range for 90 days BACKWARDS from now
+            const endTime = Date.now();                                    // Current time
+            const startTime = endTime - (90 * 24 * 60 * 60 * 1000);      // 90 days ago
+
+            // Format dates for better readability
+            const endDate = new Date();                                   // Current date
+            const startDate = new Date(endDate - (90 * 24 * 60 * 60 * 1000)); // 90 days ago
 
             console.log('\nFetching positions:');
-            console.log('From:', new Date(startTime).toLocaleString());
-            console.log('To:', new Date(endTime).toLocaleString(), '\n');
+            console.log('From:', startDate.toLocaleString());  // This should now show 90 days ago
+            console.log('To:', endDate.toLocaleString(), '\n'); // This should show current date
 
             while (hasMoreData) {
                 const params = {
