@@ -132,36 +132,86 @@ async function main() {
         });
         
         if (positions && positions.length > 0) {
-            console.log('Successfully retrieved positions:');
-            let totalPnL = 0;
-            
+            console.log('\nDetailed Position Information:');
             positions.forEach(position => {
-                totalPnL += parseFloat(position.realised);
                 console.log({
+                    // Basic Position Info
                     positionId: position.positionId,
                     symbol: position.symbol,
                     positionType: position.positionType === 1 ? 'LONG' : 'SHORT',
                     openType: position.openType === 1 ? 'ISOLATED' : 'CROSS',
-                    state: position.state,
+                    state: translateState(position.state),
+                    
+                    // Volume Information
                     holdVol: position.holdVol,
+                    frozenVol: position.frozenVol,
+                    closeVol: position.closeVol,
+                    
+                    // Price Information
+                    holdAvgPrice: position.holdAvgPrice,
                     openAvgPrice: position.openAvgPrice,
                     closeAvgPrice: position.closeAvgPrice,
-                    leverage: position.leverage,
-                    realised: position.realised,
-                    holdFee: position.holdFee,
+                    liquidatePrice: position.liquidatePrice,
+                    
+                    // Margin Information
+                    originalInitialMargin: position.oim,
+                    initialMargin: position.im,
+                    leverage: position.leverage + 'x',
+                    autoAddMargin: position.autoAddIm,
+                    
+                    // P&L and Fees
+                    holdingFee: position.holdFee,
+                    realizedPnL: position.realised,
+                    
+                    // Additional Info
+                    adlLevel: position.adlLevel,
+                    
+                    // Timestamps
                     createTime: new Date(position.createTime).toLocaleString(),
                     updateTime: new Date(position.updateTime).toLocaleString()
                 });
+                console.log('-------------------');
             });
-            
+
+            // Enhanced summary
+            const summary = positions.reduce((acc, pos) => {
+                return {
+                    totalPositions: acc.totalPositions + 1,
+                    totalPnL: acc.totalPnL + parseFloat(pos.realised),
+                    totalFees: acc.totalFees + parseFloat(pos.holdFee),
+                    longPositions: acc.longPositions + (pos.positionType === 1 ? 1 : 0),
+                    shortPositions: acc.shortPositions + (pos.positionType === 2 ? 1 : 0)
+                };
+            }, {
+                totalPositions: 0,
+                totalPnL: 0,
+                totalFees: 0,
+                longPositions: 0,
+                shortPositions: 0
+            });
+
             console.log('\nSummary:');
-            console.log(`Total Positions: ${positions.length}`);
-            console.log(`Total P&L: ${totalPnL.toFixed(4)} USDT`);
+            console.log(`Total Positions: ${summary.totalPositions}`);
+            console.log(`Long Positions: ${summary.longPositions}`);
+            console.log(`Short Positions: ${summary.shortPositions}`);
+            console.log(`Total P&L: ${summary.totalPnL.toFixed(4)} USDT`);
+            console.log(`Total Fees: ${summary.totalFees.toFixed(4)} USDT`);
+            console.log(`Net P&L: ${(summary.totalPnL - summary.totalFees).toFixed(4)} USDT`);
         } else {
             console.log('No positions found');
         }
     } catch (error) {
         console.error('Failed to fetch position history:', error.message);
+    }
+}
+
+// Helper function to translate state codes
+function translateState(state) {
+    switch(state) {
+        case 1: return 'HOLDING';
+        case 2: return 'SYSTEM AUTO-HOLDING';
+        case 3: return 'CLOSED';
+        default: return 'UNKNOWN';
     }
 }
 
