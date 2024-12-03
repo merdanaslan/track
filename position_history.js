@@ -39,9 +39,6 @@ class MexcClient {
         // Create signature string: accessKey + timestamp + paramString
         const signString = this.apiKey + timestamp + paramString;
         
-        console.log('Param string:', paramString);
-        console.log('Sign string:', signString);
-
         // Generate HMAC SHA256 signature
         return crypto
             .createHmac('sha256', this.apiSecret)
@@ -52,48 +49,64 @@ class MexcClient {
     async getPositionHistory(options = {}) {
         try {
             const endpoint = '/api/v1/private/position/list/history_positions';
-            const timestamp = Date.now().toString();
-            
-            // Prepare parameters
-            const params = {
-                page_num: options.pageNum || 1,
-                page_size: options.pageSize || 20,
-                ...(options.symbol && { symbol: options.symbol }),
-                ...(options.type && { type: options.type })
-            };
+            const pageSize = 100;
+            let allPositions = [];
+            let currentPage = 1;
+            let hasMoreData = true;
 
-            // Generate signature
-            const signature = this.generateSignature(timestamp, params);
+            // Calculate date range for 90 days (maximum allowed)
+            const endTime = Date.now();
+            const startTime = endTime - (90 * 24 * 60 * 60 * 1000); // 90 days in milliseconds
 
-            console.log('Request details:', {
-                url: `${this.baseUrl}${endpoint}`,
-                params: params,
-                headers: {
-                    'Content-Type': 'application/json',
-                    //'ApiKey': this.apiKey,
-                    'Request-Time': timestamp,
-                    'Signature': signature
+            console.log('\nFetching positions:');
+            console.log('From:', new Date(startTime).toLocaleString());
+            console.log('To:', new Date(endTime).toLocaleString(), '\n');
+
+            while (hasMoreData) {
+                const params = {
+                    page_num: currentPage,
+                    page_size: pageSize,
+                    ...(options.symbol && { symbol: options.symbol }),
+                    start_time: startTime,
+                    end_time: endTime
+                };
+
+                const timestamp = Date.now().toString();
+                const signature = this.generateSignature(timestamp, params);
+
+                const response = await axios({
+                    method: 'GET',
+                    url: `${this.baseUrl}${endpoint}`,
+                    params: params,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'ApiKey': this.apiKey,
+                        'Request-Time': timestamp,
+                        'Signature': signature,
+                        'Recv-Window': '60000'
+                    }
+                });
+
+                if (!response.data.success) {
+                    throw new Error(`API Error: ${response.data.message || 'Unknown error'}`);
                 }
-            });
 
-            const response = await axios({
-                method: 'GET',
-                url: `${this.baseUrl}${endpoint}`,
-                params: params,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'ApiKey': this.apiKey,
-                    'Request-Time': timestamp,
-                    'Signature': signature,
-                    'Recv-Window': '60000'
+                const positions = response.data.data;
+
+                if (positions.length > 0) {
+                    allPositions = allPositions.concat(positions);
+                    currentPage++;
+                } else {
+                    hasMoreData = false;
                 }
-            });
 
-            if (!response.data.success) {
-                throw new Error(`API Error: ${response.data.message || 'Unknown error'}`);
+                await new Promise(resolve => setTimeout(resolve, 300));
             }
 
-            return response.data.data;
+            // Sort positions by date (newest first)
+            allPositions.sort((a, b) => b.createTime - a.createTime);
+
+            return allPositions;
         } catch (error) {
             console.error('API Error Details:', {
                 message: error.message,
@@ -114,7 +127,7 @@ async function main() {
 
         const client = new MexcClient();
         const positions = await client.getPositionHistory({
-            symbol: 'BTC_USDT',  // Try with a specific symbol
+            symbol: '',  // Try with a specific symbol
             pageSize: 10
         });
         
