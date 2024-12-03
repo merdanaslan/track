@@ -70,7 +70,7 @@ class MexcClient {
                 params: params,
                 headers: {
                     'Content-Type': 'application/json',
-                    'ApiKey': this.apiKey,
+                    //'ApiKey': this.apiKey,
                     'Request-Time': timestamp,
                     'Signature': signature
                 }
